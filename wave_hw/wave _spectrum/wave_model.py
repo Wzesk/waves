@@ -188,7 +188,7 @@ def up_crossings(measured_data): #using pressure data
 def height_from_up_crossings(measured_data,up_crossings):
     #this using up crossings to extract periods and heights from pressure data
     data_mean = np.mean(measured_data)
-    print(data_mean) #should match sensor depth
+    print("mean depth: ",data_mean) #should match sensor depth
     periods = []
     heights = []
     for i in range(len(up_crossings)-1): # check the time and heights between each up crossing to get hightest that is wave crest

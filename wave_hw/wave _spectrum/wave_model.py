@@ -76,7 +76,7 @@ class wave_solver:
         #pressure at a given depth -- data is averaged so leaving out final cos term
 
         ##initial calculation
-        # pr = (self.grav * self.initial_depth) + (self.initial_amplitude * self.grav 
+        # pr = (self.grav * (self.initial_depth-sampleheight)) + (self.initial_amplitude * self.grav 
         # * (np.cosh(self.initial_wavenumber * 
         # (self.initial_depth + sampleheight)) / np.cosh(self.initial_wavenumber * self.initial_depth)))
         

@@ -1,7 +1,8 @@
 import numpy as np
-
+import sympy as sp
 
 class wave_solver:
+    rho = 1025 #density
     grav = 9.80665  #m^2/s
     waveperiod = 0
     wavefrequency = 0
@@ -48,26 +49,46 @@ class wave_solver:
         #set dispersion relationship
         return dr                
 
-    
+    def amp_from_horizontal(self,horizonal_velocity,sampleheight):
+        #for spectral analysis, calculate amplitude based on horizontal velocity spectra
+
+        amp = horizonal_velocity / ( self.wavefrequency * (sp.cosh(self.initial_wavenumber * (self.initial_depth + sampleheight)) / sp.sinh(self.initial_wavenumber * self.initial_depth)))
+        return amp
+
+    def amp_from_vertical(self,vertical_velocity,sampleheight):
+        #for spectral analysis, calculate amplitude based on vertical velocity spectra
+
+        amp = vertical_velocity / (self.wavefrequency * (sp.sinh(self.initial_wavenumber * (self.initial_depth + sampleheight)) / sp.sinh(self.initial_wavenumber * self.initial_depth)))
+        return amp
+
     def horizontal_velocity(self,sampleheight):
         #horizontal velocity at a given depth -- data is averaged so leaving out final cos term
-        u = self.initial_amplitude * self.wavefrequency * (np.cosh(self.initial_wavenumber * (self.initial_depth + sampleheight)) / np.sinh(self.initial_wavenumber * self.initial_depth))
+        u = self.initial_amplitude * self.wavefrequency * (sp.cosh(self.initial_wavenumber * (self.initial_depth + sampleheight)) / sp.sinh(self.initial_wavenumber * self.initial_depth))
         return u
     
     
     def vertical_velocity(self,sampleheight):
         #vertical velocity at a given depth -- data is averaged so leaving out final cos term
-        w = self.initial_amplitude * self.wavefrequency * (np.sinh(self.initial_wavenumber * (self.initial_depth + sampleheight)) / np.sinh(self.initial_wavenumber * self.initial_depth))
+        w = self.initial_amplitude * self.wavefrequency * (sp.sinh(self.initial_wavenumber * (self.initial_depth + sampleheight)) / sp.sinh(self.initial_wavenumber * self.initial_depth))
         return w
     
     def wave_pressure(self,sampleheight):
         #pressure at a given depth -- data is averaged so leaving out final cos term
-        pr = (self.grav * self.initial_depth) + (self.initial_amplitude * self.grav * (np.cosh(self.initial_wavenumber * (self.initial_depth + sampleheight)) / np.cosh(self.initial_wavenumber * self.initial_depth)))
+
+        ##initial calculation
+        # pr = (self.grav * (self.initial_depth-sampleheight)) + (self.initial_amplitude * self.grav 
+        # * (np.cosh(self.initial_wavenumber * 
+        # (self.initial_depth + sampleheight)) / np.cosh(self.initial_wavenumber * self.initial_depth)))
+        
+        #based solution handed back in class
+        pr = (self.initial_amplitude * self.grav * self.rho) * (sp.cosh(self.initial_wavenumber * 
+        (self.initial_depth + sampleheight)) / sp.cosh(self.initial_wavenumber * self.initial_depth))
+
         return pr
 
     def speed(self,wn,eff_depth):
         #calculates wave phase speed, includes shallow water term
-        wave_phase_speed = np.sqrt(self.grav / wn * np.tanh(wn * eff_depth))
+        wave_phase_speed = sp.sqrt(self.grav / wn * sp.tanh(wn * eff_depth))
         #print("phase speed: ",wave_phase_speed, " at depth: ",eff_depth)
         
         return wave_phase_speed
@@ -90,7 +111,7 @@ class wave_solver:
         shoal_wave_number = shoal_dr * self.wavefrequency**2 / self.grav #wave number at shoal depth
         shoal_group_speed = self.group_speed(shoal_wave_number, shoal_depth) #shoal group speed
 
-        return np.sqrt(initial_group_speed / shoal_group_speed)#wave height ratio
+        return sp.sqrt(initial_group_speed / shoal_group_speed)#wave height ratio
         
     def refraction_coefficient(self,incedent_angle,shoal_depth):
         if incedent_angle == 0:
@@ -120,18 +141,37 @@ class wave_solver:
         
         return ray_span_ratio
 
+    def stokes_drift(self,z=0):
+        #define variables
+        a = self.initial_amplitude;w=self.wavefrequency;k=self.initial_wavenumber;h=self.initial_depth
+        #calculate langrangian stokes drift at given Z value
+        drift = (a**2)*w*k*((sp.cosh(2*k*(z+h)))/(2*(sp.sinh(k*h)**2)))
+        return drift
+
+    def integrated_mass_flux(self,depth):
+        #calculated integrated mass flux at different depths -incorporating shoaling
+        #todo: add refraction
+
+        #initial properties of wave
+        a = self.initial_amplitude;g=self.grav;rho=self.rho
+
+        #properties updated to shoal depth
+        c=self.speed(self.initial_wavenumber,depth)
+        a = a * self.shoaling_coefficient(depth)
+
+        #calculate flux
+        flux = 0.5 *((rho*(a**2)*g)/c)
+        return flux
 
 
 
-        """
-        def uu_to_pp(uxx,f,depth,sample_depth):
+
+def uu_to_pp(uxx,f,depth,sample_depth):
     if f>0 and uxx>0 and f<100:
         wave_period = 1/f
         #print("calculated period: ",wave_period)
         spec_wave = wave_solver(wave_period,depth,1)#starting with dummy amplitude of 1
         spec_wave.initial_amplitude = spec_wave.amp_from_horizontal(uxx,sample_depth) # set a calculated amplitude
-        #amplitude of the spectrum is analogous to variance and your expression below that relates the horizontal spectrum to “amp” should be squared to be consistent with equation 21 in lecture 9
-        variance = spec_wave.initial_amplitude**2
         pressure = spec_wave.wave_pressure(sample_depth)
         #print("calculated amp: ",spec_wave.initial_amplitude)
         return pressure
@@ -140,8 +180,6 @@ class wave_solver:
         wave_period = 1
         spec_wave = wave_solver(wave_period,depth,1)#starting with dummy amplitude of 1
         spec_wave.initial_amplitude = spec_wave.amp_from_horizontal(1,sample_depth) # set a calculated amplitude
-        #amplitude of the spectrum is analogous to variance and your expression below that relates the horizontal spectrum to “amp” should be squared to be consistent with equation 21 in lecture 9
-        variance = spec_wave.initial_amplitude**2
         pressure = spec_wave.wave_pressure(sample_depth)
         return pressure
 
@@ -151,8 +189,6 @@ def ww_to_pp(wxx,f,depth,sample_depth):
         #print("calculated period: ",wave_period)
         spec_wave = wave_solver(wave_period,depth,1)#starting with dummy amplitude of 1
         spec_wave.initial_amplitude = spec_wave.amp_from_vertical(wxx,sample_depth) # set a calculated amplitude
-        #amplitude of the spectrum is analogous to variance and your expression below that relates the horizontal spectrum to “amp” should be squared to be consistent with equation 21 in lecture 9
-        variance = spec_wave.initial_amplitude**2
         pressure = spec_wave.wave_pressure(sample_depth)
         #print("calculated amp: ",spec_wave.initial_amplitude)
         return pressure
@@ -161,8 +197,31 @@ def ww_to_pp(wxx,f,depth,sample_depth):
         wave_period = 1
         spec_wave = wave_solver(wave_period,depth,1)#starting with dummy amplitude of 1
         spec_wave.initial_amplitude = spec_wave.amp_from_vertical(wxx,sample_depth) # set a calculated amplitude
-        #amplitude of the spectrum is analogous to variance and your expression below that relates the horizontal spectrum to “amp” should be squared to be consistent with equation 21 in lecture 9
-        variance = spec_wave.initial_amplitude**2
         pressure = spec_wave.wave_pressure(sample_depth)
         return pressure
-        """
+
+def up_crossings(measured_data): #using pressure data
+    data_mean = np.mean(measured_data)
+    up_crossings = []
+    for i in range(len(measured_data)-1): # check to see if value crosses mean at each step.  If it goes from neg to pos it is an upcrossing
+        prev_sample = measured_data[i]-data_mean #find out if prev sample was above or below mean
+        next_sample = measured_data[i+1]-data_mean #find out if next sample was above or below mean
+        if(prev_sample<0 and next_sample>0): #it is an upcrossing
+            up_crossings.append(i)
+    return up_crossings
+
+def height_from_up_crossings(measured_data,up_crossings):
+    #this using up crossings to extract periods and heights from pressure data
+    data_mean = np.mean(measured_data)
+    print("mean depth: ",data_mean) #should match sensor depth
+    periods = []
+    heights = []
+    for i in range(len(up_crossings)-1): # check the time and heights between each up crossing to get hightest that is wave crest
+        periods.append((up_crossings[i+1]-up_crossings[i])* 0.03125)#gap between up-crossings converted to seconds
+        period_pressures= measured_data[up_crossings[i]:up_crossings[i+1]]
+        heights.append((sorted(period_pressures, reverse=True)[0] - data_mean)*2) # get the highest point and subtract the mean
+    return periods, heights
+
+def return_significant(wave_data):
+    top_third = sorted(wave_data, reverse=True)[0:int((np.round((len(wave_data)/3))))]
+    return np.mean(top_third)

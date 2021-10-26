@@ -141,6 +141,13 @@ class wave_solver:
         
         return ray_span_ratio
 
+
+def spectrum_horizontal_to_pressure(uu,vv):
+    rho = 1025 #density
+    grav = 9.80665  #m^2/s
+    pressure = (uu+vv)*grav*(rho**2)
+    return pressure
+
 def uu_to_pp(uxx,f,depth,sample_depth):
     if f>0 and uxx>0 and f<100:
         wave_period = 1/f

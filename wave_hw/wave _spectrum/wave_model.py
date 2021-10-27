@@ -142,11 +142,39 @@ class wave_solver:
         return ray_span_ratio
 
 
-def spectrum_horizontal_to_pressure(uu,vv):
-    rho = 1025 #density
+
+def spectrum_horizontal_to_pressure(uu,vv,f,depth):
     grav = 9.80665  #m^2/s
-    pressure = (uu+vv)*grav*(rho**2)
+    rho = 1025 #density
+    w = f #wave frequency
+    dr = spectrum_dispersion(depth,w,grav)
+    k = dr * w**2 / grav
+    pressure = (uu+vv)*((rho/k*w)**2)
     return pressure
+
+def spectrum_dispersion(eff_depth,wavefrequency,grav):
+    depthratio = wavefrequency**2 * eff_depth / grav
+    if not depthratio > 0:
+        depthratio = 0.01
+        
+    # Guess at dispersion relationship (from https://www.sciencedirect.com/science/article/pii/037838399090032R):
+    dr = np.tanh(depthratio ** 0.75) ** (-2.0 / 3.0)
+    
+    #converge iteratively (strategy based on https://github.com/ChrisBarker-NOAA/wave_utils)
+    iter = 0
+    f = dr * np.tanh(dr * depthratio) - 1
+    while abs(f) > 1e-10:
+        qp = dr * depthratio
+        fp = qp / (np.cosh(qp) ** 2) + np.tanh(qp)
+        dr = dr - f / fp
+        f = dr * np.tanh(dr * depthratio) - 1
+        iter += 1
+        if iter > 200:
+            raise RuntimeError("could not converge")
+    #set dispersion relationship
+    return dr
+
+
 
 def uu_to_pp(uxx,f,depth,sample_depth):
     if f>0 and uxx>0 and f<100:

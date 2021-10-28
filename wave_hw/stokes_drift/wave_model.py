@@ -196,11 +196,19 @@ def spectrum_dispersion(eff_depth,wavefrequency,grav):
     return dr
 
 def stoke_drift_from_spectrum(a,f,depth,sample_depth):
+    #get the drift for a specific wave frequency within a spectrum
     wave_period = 1/f
     spec_wave = wave_solver(wave_period,depth,a)
     drift = spec_wave.stokes_drift(z=sample_depth)
     return drift
 
+def integrated_stoke_drift(a_array,f_array,depth,sample_depth):
+    #get a drift spectrum from the sea surface spectrum -- need to rework function names
+    drift_spectrum = []
+    for i in range(len(a_array)):
+        drift_spectrum.append(stoke_drift_from_spectrum(a_array[i],f_array[i],depth,sample_depth))
+
+    return drift_spectrum
 
 def uu_to_pp(uxx,f,depth,sample_depth):
     if f>0 and uxx>0 and f<100:

@@ -111,7 +111,7 @@ class wave_solver:
         shoal_wave_number = shoal_dr * self.wavefrequency**2 / self.grav #wave number at shoal depth
         shoal_group_speed = self.group_speed(shoal_wave_number, shoal_depth) #shoal group speed
 
-        return sp.sqrt(initial_group_speed / shoal_group_speed)#wave height ratio
+        return np.sqrt(initial_group_speed / shoal_group_speed)#wave height ratio
         
     def refraction_coefficient(self,incedent_angle,shoal_depth):
         if incedent_angle == 0:
@@ -141,27 +141,6 @@ class wave_solver:
         
         return ray_span_ratio
 
-    def stokes_drift(self,z=0):
-        #define variables
-        a = self.initial_amplitude;w=self.wavefrequency;k=self.initial_wavenumber;h=self.initial_depth
-        #calculate langrangian stokes drift at given Z value
-        drift = (a**2)*w*k*((sp.cosh(2*k*(z+h)))/(2*(sp.sinh(k*h)**2)))
-        return drift
-
-    def integrated_mass_flux(self,depth):
-        #calculated integrated mass flux at different depths -incorporating shoaling
-        #todo: add refraction
-
-        #initial properties of wave
-        a = self.initial_amplitude;g=self.grav;rho=self.rho
-
-        #properties updated to shoal depth
-        c=self.speed(self.initial_wavenumber,depth)
-        a = a * self.shoaling_coefficient(depth)
-
-        #calculate flux
-        flux = 0.5 *((rho*(a**2)*g)/c)
-        return flux
 
 
 def spectrum_horizontal_to_pressure(uu,vv,f,depth):
@@ -195,20 +174,7 @@ def spectrum_dispersion(eff_depth,wavefrequency,grav):
     #set dispersion relationship
     return dr
 
-def stoke_drift_from_spectrum(a,f,depth,sample_depth):
-    #get the drift for a specific wave frequency within a spectrum
-    wave_period = 1/f
-    spec_wave = wave_solver(wave_period,depth,a)
-    drift = spec_wave.stokes_drift(z=sample_depth)
-    return drift
 
-def integrated_stoke_drift(a_array,f_array,depth,sample_depth):
-    #get a drift spectrum from the sea surface spectrum -- need to rework function names
-    drift_spectrum = []
-    for i in range(len(a_array)):
-        drift_spectrum.append(stoke_drift_from_spectrum(a_array[i],f_array[i],depth,sample_depth))
-
-    return drift_spectrum
 
 def uu_to_pp(uxx,f,depth,sample_depth):
     if f>0 and uxx>0 and f<100:

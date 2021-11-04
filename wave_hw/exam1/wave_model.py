@@ -1,6 +1,8 @@
 import numpy as np
 import sympy as sp
 
+whf = 0.8 #wave height fraction
+
 class wave_solver:
     rho = 1025 #density
     grav = 9.80665  #m^2/s
@@ -134,9 +136,10 @@ class wave_solver:
         #print("sin of incedent angle: ",np.sin(rad_incedent_angle),"group speed ratio: ",group_speed_ratio)
         
         #calculate new refracted angle   I think this matches --> theta=arcsin(c*sin(theta_deep)/c_deep). 
-        rad_refracted_angle = np.arcsin(np.sin(rad_incedent_angle) * phase_speed_ratio)
+        ac = float(np.sin(rad_incedent_angle) * phase_speed_ratio)
+        rad_refracted_angle = np.arcsin(ac)
         
-        #new distance between rays
+        #new distance between ray
         ray_span_ratio =np.sqrt( np.cos(rad_refracted_angle)/np.cos(rad_incedent_angle))
         
         return ray_span_ratio
@@ -165,7 +168,6 @@ class wave_solver:
 
 
 def spectrum_horizontal_to_pressure(uu,vv,f,depth):
-    #calculate pressure for frequency within wave spectrum
     grav = 9.80665  #m^2/s
     rho = 1025 #density
     w = f #wave frequency
@@ -175,7 +177,6 @@ def spectrum_horizontal_to_pressure(uu,vv,f,depth):
     return pressure
 
 def spectrum_dispersion(eff_depth,wavefrequency,grav):
-    #dispersion relationship function
     depthratio = wavefrequency**2 * eff_depth / grav
     if not depthratio > 0:
         depthratio = 0.01
@@ -199,7 +200,7 @@ def spectrum_dispersion(eff_depth,wavefrequency,grav):
 
 def stoke_drift_from_spectrum(a,f,depth,sample_depth):
     #get the drift for a specific wave frequency within a spectrum
-    wave_period = 1/f 
+    wave_period = 1/f
     spec_wave = wave_solver(wave_period,depth,a)
     drift = spec_wave.stokes_drift(z=sample_depth)
     return drift
@@ -269,5 +270,22 @@ def height_from_up_crossings(measured_data,up_crossings):
     return periods, heights
 
 def return_significant(wave_data):
+
+
     top_third = sorted(wave_data, reverse=True)[0:int((np.round((len(wave_data)/3))))]
     return np.mean(top_third)
+
+def radiation_stresses(energy_density,group_speed,phase_speed,incedent_angle):
+    e=energy_density;cg=group_speed;c=phase_speed;ia=np.radians(incedent_angle)
+    xx = e ((cg/c)-0.5+(cg/c*(np.cos(ia)**2))) 
+    yy = e ((cg/c)-0.5+(cg/c*(np.sin(ia)**2)))
+    xy = e(cg/c)*np.sin(ia)*np.cos(ia)
+    return xx, yy,xy
+
+def wave_induced_setup():
+    h = 0
+    return h
+
+def along_shelf_current():
+    u = 0
+    return u

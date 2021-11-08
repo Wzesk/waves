@@ -1,7 +1,8 @@
 import numpy as np
 import sympy as sp
 
-whf = 0.8 #wave height fraction
+#constants
+gamma = 0.8 #depth limited wave height ratio
 
 class wave_solver:
     rho = 1025 #density
@@ -275,17 +276,46 @@ def return_significant(wave_data):
     top_third = sorted(wave_data, reverse=True)[0:int((np.round((len(wave_data)/3))))]
     return np.mean(top_third)
 
-def radiation_stresses(energy_density,group_speed,phase_speed,incedent_angle):
-    e=energy_density;cg=group_speed;c=phase_speed;ia=np.radians(incedent_angle)
+def radiation_stresses(amplitude,group_speed,phase_speed,incedent_angle):
+    e = energy_density(amplitude)
+    cg=group_speed;c=phase_speed;ia=np.radians(incedent_angle)
     xx = e ((cg/c)-0.5+(cg/c*(np.cos(ia)**2))) 
     yy = e ((cg/c)-0.5+(cg/c*(np.sin(ia)**2)))
     xy = e(cg/c)*np.sin(ia)*np.cos(ia)
     return xx, yy,xy
 
-def wave_induced_setup():
-    h = 0
-    return h
+def energy_density(amplitude,rho=1025,grav=9.80665):
+    h = amplitude*2
+    #e = rho*grav*(h**2)/8 #in lecture 12
+    e = rho*grav*(h**2)/16 #in lecture 13
+    return e
 
-def along_shelf_current():
-    u = 0
-    return u
+def shoreline_wave_height_ratio(amplitude,depth):
+    wh = 2*amplitude #wave height, Hb in the notes
+    hb = wh/gamma #depth where breaking starts
+    ba = amplitude # default to existing amplitude
+    if depth < hb:#if the sample
+        ba = depth*gamma/2 #sample depth * gamma to get height / 2 for amplitude
+    return ba/amplitude 
+
+def wave_induced_set(amplitude,wave_number,depth):
+    k=wave_number
+    wh = 2*amplitude #wave height, Hb in the notes
+    hb = wh/gamma #depth where breaking starts
+    ba = amplitude # default to existing amplitude
+
+    #start by factoring in setdown at breaking
+    wave_set = (-1/8) * ((wh**2)*k)/(sp.sinh(2*k*hb))
+    
+    #now incorporate setup from breaking
+    if depth < hb:#if the sample depth is within the shoreline setup
+        wave_set = 0.2*(ba-depth) #amount of setup (height in meters)
+    return wave_set
+
+
+def along_shelf_current(incedent_angle,depth,slope,drag_coefficient,rho=1025,grav=9.80665):
+    theta = np.radians(incedent_angle)
+    Cd = drag_coefficient
+    mean_velocity = (5*gamma*slope) / (8*Cd) * (np.sin(theta))/(np.sqrt(grav*depth))*grav*depth
+    return mean_velocity
+

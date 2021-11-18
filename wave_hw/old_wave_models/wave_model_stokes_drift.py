@@ -1,9 +1,6 @@
 import numpy as np
 import sympy as sp
 
-#constants
-gamma = 0.8 #depth limited wave height ratio
-
 class wave_solver:
     rho = 1025 #density
     grav = 9.80665  #m^2/s
@@ -15,7 +12,7 @@ class wave_solver:
     initial_depth = 0
     initial_wavelength = 0
     initial_wavenumber = 0
-    
+    shoal_wavenumber = 0
     
     def __init__(self,measuredperiod,init_depth, measuredamplitude):
         #set simple properties
@@ -111,8 +108,8 @@ class wave_solver:
         initial_group_speed = self.group_speed(self.initial_wavenumber, self.initial_depth) #deep group speed
 
         shoal_dr = self.dispersion(shoal_depth) #dispersion relationship at shoal depth
-        shoal_wave_number = shoal_dr * self.wavefrequency**2 / self.grav #wave number at shoal depth
-        shoal_group_speed = self.group_speed(shoal_wave_number, shoal_depth) #shoal group speed
+        self.shoal_wavenumber = shoal_dr * self.wavefrequency**2 / self.grav #wave number at shoal depth
+        shoal_group_speed = self.group_speed(self.shoal_wavenumber, shoal_depth) #shoal group speed
 
         return sp.sqrt(initial_group_speed / shoal_group_speed)#wave height ratio
         
@@ -137,10 +134,9 @@ class wave_solver:
         #print("sin of incedent angle: ",np.sin(rad_incedent_angle),"group speed ratio: ",group_speed_ratio)
         
         #calculate new refracted angle   I think this matches --> theta=arcsin(c*sin(theta_deep)/c_deep). 
-        ac = float(np.sin(rad_incedent_angle) * phase_speed_ratio)
-        rad_refracted_angle = np.arcsin(ac)
+        rad_refracted_angle = np.arcsin(np.sin(rad_incedent_angle) * phase_speed_ratio)
         
-        #new distance between ray
+        #new distance between rays
         ray_span_ratio =np.sqrt( np.cos(rad_refracted_angle)/np.cos(rad_incedent_angle))
         
         return ray_span_ratio
@@ -153,19 +149,30 @@ class wave_solver:
         return drift
 
     def integrated_mass_flux(self,depth):
-        #calculated integrated mass flux at different depths -incorporating shoaling
+        #calculated integrated mass flux at different depths
+        #this incorporates shoaling
         #todo: add refraction
 
         #initial properties of wave
-        a = self.initial_amplitude;g=self.grav;rho=self.rho
+        a=self.initial_amplitude
+        g=self.grav
+        rho=self.rho
+        w=self.wavefrequency
+        k=self.initial_wavenumber
 
         #properties updated to shoal depth
         c=self.speed(self.initial_wavenumber,depth)
         a = a * self.shoaling_coefficient(depth)
+        k=self.shoal_wavenumber #corrected so using shoal wave number
 
-        #calculate flux
-        flux = 0.5 *((rho*(a**2)*g)/c)
-        return flux
+        ##calculate flux
+        flux = 0.5 *((rho*(a**2)*g)/c) #my original expression
+        #flux = 0.5 *((rho*(a**2)*g)*k/w) #alternative version from HW solution
+
+        #calculate depth averaged current from mass flux function added based on HW solution
+        current=flux/(rho*depth)
+
+        return flux,current
 
 
 def spectrum_horizontal_to_pressure(uu,vv,f,depth):
@@ -271,51 +278,5 @@ def height_from_up_crossings(measured_data,up_crossings):
     return periods, heights
 
 def return_significant(wave_data):
-
-
     top_third = sorted(wave_data, reverse=True)[0:int((np.round((len(wave_data)/3))))]
     return np.mean(top_third)
-
-def radiation_stresses(amplitude,group_speed,phase_speed,incedent_angle):
-    e = energy_density(amplitude)
-    cg=group_speed;c=phase_speed;ia=np.radians(incedent_angle)
-    xx = e ((cg/c)-0.5+(cg/c*(np.cos(ia)**2))) 
-    yy = e ((cg/c)-0.5+(cg/c*(np.sin(ia)**2)))
-    xy = e(cg/c)*np.sin(ia)*np.cos(ia)
-    return xx, yy,xy
-
-def energy_density(amplitude,rho=1025,grav=9.80665):
-    h = amplitude*2
-    #e = rho*grav*(h**2)/8 #in lecture 12
-    e = rho*grav*(h**2)/16 #in lecture 13
-    return e
-
-def shoreline_wave_height_ratio(amplitude,depth):
-    wh = 2*amplitude #wave height, Hb in the notes
-    hb = wh/gamma #depth where breaking starts
-    ba = amplitude # default to existing amplitude
-    if depth < hb:#if the sample
-        ba = depth*gamma/2 #sample depth * gamma to get height / 2 for amplitude
-    return ba/amplitude 
-
-def wave_induced_set(amplitude,wave_number,depth):
-    k=wave_number
-    wh = 2*amplitude #wave height, Hb in the notes
-    hb = wh/gamma #depth where breaking starts
-    ba = amplitude # default to existing amplitude
-
-    #start by factoring in setdown at breaking
-    wave_set = (-1/8) * ((wh**2)*k)/(sp.sinh(2*k*hb))
-    
-    #now incorporate setup from breaking
-    if depth < hb:#if the sample depth is within the shoreline setup
-        wave_set = 0.2*(ba-depth) #amount of setup (height in meters)
-    return wave_set
-
-
-def along_shelf_current(incedent_angle,depth,slope,drag_coefficient,rho=1025,grav=9.80665):
-    theta = np.radians(incedent_angle)
-    Cd = drag_coefficient
-    mean_velocity = (5*gamma*slope) / (8*Cd) * (np.sin(theta))/(np.sqrt(grav*depth))*grav*depth
-    return mean_velocity
-
